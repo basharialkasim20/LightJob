@@ -10,6 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: account
+    description: Signed-in account and dashboard operations
+  - name: tasks
+    description: Task marketplace and submission operations
+  - name: wallet
+    description: Wallet, ledger, referrals, and withdrawals
+  - name: admin
+    description: Protected platform administration operations
 paths:
   /healthz:
     get:
@@ -24,7 +32,412 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /me:
+    get:
+      operationId: getMe
+      tags: [account]
+      summary: Get the signed-in account
+      responses:
+        "200":
+          description: Account profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [account]
+      summary: Get the signed-in dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: Browse available tasks
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, paused, completed, all]
+            default: open
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        "200":
+          description: Task marketplace page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskList"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a task as an advertiser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /tasks/{taskId}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: Get task details
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /tasks/{taskId}/submissions:
+    post:
+      operationId: submitTask
+      tags: [tasks]
+      summary: Submit proof for a task
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionInput"
+      responses:
+        "201":
+          description: Submission created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /submissions:
+    get:
+      operationId: listSubmissions
+      tags: [tasks]
+      summary: List the signed-in user's submissions
+      parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [mine, owned]
+            default: mine
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, all]
+            default: all
+      responses:
+        "200":
+          description: Submission list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Submission"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /submissions/{submissionId}/review:
+    post:
+      operationId: reviewSubmission
+      tags: [tasks]
+      summary: Approve or reject a worker submission
+      parameters:
+        - $ref: "#/components/parameters/SubmissionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionReviewInput"
+      responses:
+        "200":
+          description: Reviewed submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /wallet/summary:
+    get:
+      operationId: getWalletSummary
+      tags: [wallet]
+      summary: Get wallet balances and earnings
+      responses:
+        "200":
+          description: Wallet summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /wallet/transactions:
+    get:
+      operationId: listTransactions
+      tags: [wallet]
+      summary: List wallet transactions
+      responses:
+        "200":
+          description: Wallet transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /referrals/summary:
+    get:
+      operationId: getReferralSummary
+      tags: [wallet]
+      summary: Get referral link and performance
+      responses:
+        "200":
+          description: Referral summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferralSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /withdrawals:
+    get:
+      operationId: listWithdrawals
+      tags: [wallet]
+      summary: List withdrawal requests
+      responses:
+        "200":
+          description: Withdrawal requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Withdrawal"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createWithdrawal
+      tags: [wallet]
+      summary: Request a wallet withdrawal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalInput"
+      responses:
+        "201":
+          description: Withdrawal request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdrawal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      summary: Get protected admin overview
+      responses:
+        "200":
+          description: Admin overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin]
+      summary: List users for administration
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUser"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/users/{userId}/role:
+    patch:
+      operationId: updateUserRole
+      tags: [admin]
+      summary: Grant or revoke admin permission
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdateInput"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/withdrawals:
+    get:
+      operationId: listAdminWithdrawals
+      tags: [admin]
+      summary: List withdrawals awaiting review
+      responses:
+        "200":
+          description: Withdrawal queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Withdrawal"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/withdrawals/{withdrawalId}/review:
+    post:
+      operationId: reviewWithdrawal
+      tags: [admin]
+      summary: Approve or reject a withdrawal
+      parameters:
+        - $ref: "#/components/parameters/WithdrawalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalReviewInput"
+      responses:
+        "200":
+          description: Reviewed withdrawal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdrawal"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 components:
+  parameters:
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+    SubmissionId:
+      name: submissionId
+      in: path
+      required: true
+      schema:
+        type: string
+    WithdrawalId:
+      name: withdrawalId
+      in: path
+      required: true
+      schema:
+        type: string
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Insufficient permission
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +446,220 @@ components:
           type: string
       required:
         - status
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    UserProfile:
+      type: object
+      required: [id, name, email, role, balance, referralCode, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        avatarUrl: { type: ["string", "null"], format: uri }
+        role:
+          type: string
+          enum: [worker, advertiser, admin, super_admin]
+        balance: { type: number }
+        referralCode: { type: string }
+        referredBy: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    DashboardSummary:
+      type: object
+      required: [profile, activeTasks, availableTasks, completedTasks, earningsThisMonth, pendingReview, referralEarnings, recentActivity, earningsTrend]
+      properties:
+        profile: { $ref: "#/components/schemas/UserProfile" }
+        activeTasks: { type: integer }
+        availableTasks: { type: integer }
+        completedTasks: { type: integer }
+        earningsThisMonth: { type: number }
+        pendingReview: { type: integer }
+        referralEarnings: { type: number }
+        recentActivity:
+          type: array
+          items: { $ref: "#/components/schemas/Activity" }
+        earningsTrend:
+          type: array
+          items: { $ref: "#/components/schemas/EarningsPoint" }
+    Activity:
+      type: object
+      required: [id, type, title, description, timestamp]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [earning, submission, referral, withdrawal, task] }
+        title: { type: string }
+        description: { type: string }
+        amount: { type: ["number", "null"] }
+        timestamp: { type: string, format: date-time }
+    EarningsPoint:
+      type: object
+      required: [label, amount]
+      properties:
+        label: { type: string }
+        amount: { type: number }
+    Task:
+      type: object
+      required: [id, title, advertiserId, advertiserName, category, description, instructions, proofType, reward, totalBudget, remainingBudget, maxCompletions, completedCount, status, deadline, createdAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        advertiserId: { type: string }
+        advertiserName: { type: string }
+        category: { type: string }
+        description: { type: string }
+        instructions: { type: string }
+        proofType: { type: string, enum: [text, url, image, file] }
+        reward: { type: number }
+        totalBudget: { type: number }
+        remainingBudget: { type: number }
+        maxCompletions: { type: integer }
+        completedCount: { type: integer }
+        status: { type: string, enum: [open, paused, completed] }
+        deadline: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    TaskInput:
+      type: object
+      required: [title, category, description, instructions, proofType, reward, maxCompletions, deadline]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 120 }
+        category: { type: string, minLength: 2, maxLength: 40 }
+        description: { type: string, minLength: 10, maxLength: 1000 }
+        instructions: { type: string, minLength: 10, maxLength: 2000 }
+        proofType: { type: string, enum: [text, url, image, file] }
+        reward: { type: number, minimum: 0.01 }
+        maxCompletions: { type: integer, minimum: 1, maximum: 100000 }
+        deadline: { type: string, format: date-time }
+    TaskList:
+      type: object
+      required: [items, page, limit, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Task" }
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+    Submission:
+      type: object
+      required: [id, taskId, taskTitle, workerId, workerName, proof, status, reward, submittedAt]
+      properties:
+        id: { type: string }
+        taskId: { type: string }
+        taskTitle: { type: string }
+        workerId: { type: string }
+        workerName: { type: string }
+        proof: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        reward: { type: number }
+        reviewerNote: { type: ["string", "null"] }
+        submittedAt: { type: string, format: date-time }
+        reviewedAt: { type: ["string", "null"], format: date-time }
+    SubmissionInput:
+      type: object
+      required: [proof]
+      properties:
+        proof: { type: string, minLength: 1, maxLength: 5000 }
+    SubmissionReviewInput:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approved, rejected] }
+        reviewerNote: { type: string, maxLength: 1000 }
+    WalletSummary:
+      type: object
+      required: [availableBalance, pendingBalance, totalEarned, totalSpent, referralEarned, withdrawals]
+      properties:
+        availableBalance: { type: number }
+        pendingBalance: { type: number }
+        totalEarned: { type: number }
+        totalSpent: { type: number }
+        referralEarned: { type: number }
+        withdrawals: { type: number }
+    Transaction:
+      type: object
+      required: [id, type, description, amount, status, createdAt]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [task_reward, referral_reward, task_funding, withdrawal, refund] }
+        description: { type: string }
+        amount: { type: number }
+        status: { type: string, enum: [completed, pending, failed] }
+        taskId: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    ReferralSummary:
+      type: object
+      required: [referralCode, referralLink, directReferrals, referralEarnings, recentReferrals]
+      properties:
+        referralCode: { type: string }
+        referralLink: { type: string, format: uri }
+        directReferrals: { type: integer }
+        referralEarnings: { type: number }
+        recentReferrals:
+          type: array
+          items: { $ref: "#/components/schemas/Referral" }
+    Referral:
+      type: object
+      required: [id, name, joinedAt, earned]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        joinedAt: { type: string, format: date-time }
+        earned: { type: number }
+    Withdrawal:
+      type: object
+      required: [id, amount, method, status, requestedAt]
+      properties:
+        id: { type: string }
+        amount: { type: number }
+        method: { type: string, enum: [bank_transfer, mobile_money, crypto] }
+        accountLabel: { type: string }
+        status: { type: string, enum: [pending, approved, rejected, paid] }
+        note: { type: ["string", "null"] }
+        requestedAt: { type: string, format: date-time }
+        processedAt: { type: ["string", "null"], format: date-time }
+    WithdrawalInput:
+      type: object
+      required: [amount, method, accountLabel]
+      properties:
+        amount: { type: number, minimum: 1 }
+        method: { type: string, enum: [bank_transfer, mobile_money, crypto] }
+        accountLabel: { type: string, minLength: 3, maxLength: 120 }
+    WithdrawalReviewInput:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approved, rejected, paid] }
+        note: { type: string, maxLength: 500 }
+    AdminOverview:
+      type: object
+      required: [totalUsers, activeTasks, pendingSubmissions, pendingWithdrawals, totalVolume, platformRevenue, payoutSplit]
+      properties:
+        totalUsers: { type: integer }
+        activeTasks: { type: integer }
+        pendingSubmissions: { type: integer }
+        pendingWithdrawals: { type: integer }
+        totalVolume: { type: number }
+        platformRevenue: { type: number }
+        payoutSplit:
+          type: object
+          required: [owner, worker, referrer]
+          properties:
+            owner: { type: number }
+            worker: { type: number }
+            referrer: { type: number }
+    AdminUser:
+      allOf:
+        - $ref: "#/components/schemas/UserProfile"
+        - type: object
+          required: [lastActiveAt]
+          properties:
+            lastActiveAt: { type: string, format: date-time }
+    RoleUpdateInput:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [worker, advertiser, admin] }
 

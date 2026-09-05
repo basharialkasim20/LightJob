@@ -1,0 +1,89 @@
+Build the first complete version of LightJob.
+
+LightJob is a task marketplace and referral platform.
+
+CORE RULES:
+
+- Users can register and log in.
+- Every normal user has a personal dashboard.
+- Users can create tasks by depositing/budgeting money for them.
+- Tasks can have flexible requirements, including KYC Required or No KYC.
+- KYC-required tasks cost the advertiser ₦400 per completed worker.
+- Tasks without KYC requirement cost ₦200 per completed worker.
+- For every approved completed task:
+  - 40% goes to the platform owner.
+  - 40% goes to the worker who completed the task.
+  - 20% goes to the worker's direct referrer.
+- The 40/40/20 split must be calculated automatically by the system.
+- The direct referrer earns the 20% even if the referrer is the platform owner.
+- Users can invite other users using a unique referral link/code.
+- Users can see their referral earnings and transaction history.
+- Users can request withdrawals.
+- Withdrawals must appear in the admin withdrawal queue.
+- Admin can mark a withdrawal as "Sent Successfully" after making the external bank transfer.
+- Do NOT automatically claim that a bank transfer was actually sent. "Sent Successfully" should only be an admin confirmation/status after the admin has made the payment.
+- Task verification should be rule-based and support proof submission.
+- Prevent duplicate task submissions and duplicate rewards.
+- Keep complete transaction records.
+
+USER DASHBOARD:
+
+- Balance
+- Total earnings
+- Completed tasks
+- Referral earnings
+- Available tasks
+- My tasks
+- Create task
+- Wallet
+- Deposit
+- Withdraw
+- Referral
+- Transaction history
+- Notifications
+- Settings
+
+TASK CREATION:
+Allow the advertiser to define:
+
+- Task title
+- Description
+- Task requirements
+- Whether KYC is required
+- Reward category
+- Number of workers
+- Proof required
+- Start/end date
+- Total budget
+
+ADMIN SYSTEM:
+
+- There must be NO public admin registration.
+- Normal users must NOT see an Admin option.
+- Only a Super Admin can explicitly grant an existing user the Admin role.
+- Only users with an authorized admin role can access the Admin Dashboard.
+- Protect admin routes on the server/backend, not only in the frontend.
+- Super Admin can manage admins.
+- Admin Dashboard should include:
+  - Users
+  - Tasks
+  - Task submissions
+  - Deposits
+  - Withdrawals
+  - Transactions
+  - Referrals
+  - KYC status
+  - Reports
+  - Admin management
+
+IMPORTANT:
+
+- Do not use hard-coded balances or fake transaction records.
+- Use a real database schema for users, roles, tasks, submissions, wallets, transactions, referrals, withdrawals and deposits.
+- Use secure authentication and authorization.
+- Store monetary values safely and avoid floating-point errors.
+- Make the UI responsive and mobile-first because many users will access LightJob from Android phones.
+- Use a clean, modern, professional interface.
+- Use "LightJob" as the platform name throughout the UI.
+- Build the application so that real payment gateway and KYC integrations can be added later without rewriting the core architecture.
+- For now, keep payment processing in a development/sandbox state. Do not pretend that real money has been transferred.

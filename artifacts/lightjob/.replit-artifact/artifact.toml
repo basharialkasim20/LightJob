@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "LightJob"
+description = "A task and referral marketplace where advertisers publish verified work, workers earn from completing it, and payouts are distributed transparently across the referral network."
+version = "1.0.0"
+id = "artifacts/lightjob"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25837
+
+[services.development]
+run = "pnpm --filter @workspace/lightjob run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/lightjob", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/lightjob/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25837"
+BASE_PATH = "/"
