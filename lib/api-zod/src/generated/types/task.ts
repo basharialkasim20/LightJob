@@ -17,6 +17,7 @@ export interface Task {
   description: string;
   instructions: string;
   proofType: TaskProofType;
+  requiresKyc: boolean;
   reward: number;
   totalBudget: number;
   remainingBudget: number;

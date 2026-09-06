@@ -11,8 +11,10 @@ export type TransactionType = typeof TransactionType[keyof typeof TransactionTyp
 
 export const TransactionType = {
   task_reward: 'task_reward',
+  platform_reward: 'platform_reward',
   referral_reward: 'referral_reward',
   task_funding: 'task_funding',
+  deposit: 'deposit',
   withdrawal: 'withdrawal',
   refund: 'refund',
 } as const;

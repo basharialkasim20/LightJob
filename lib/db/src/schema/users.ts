@@ -10,6 +10,7 @@ export const usersTable = pgTable("lightjob_users", {
   role: text("role").notNull().default("worker"),
   balance: numeric("balance", { precision: 12, scale: 2 }).notNull().default("0"),
   referralCode: text("referral_code").notNull().unique(),
+  depositReference: text("deposit_reference"),
   referredBy: text("referred_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

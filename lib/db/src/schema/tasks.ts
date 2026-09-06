@@ -1,4 +1,4 @@
-import { pgTable, text, numeric, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, numeric, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,6 +10,7 @@ export const tasksTable = pgTable("lightjob_tasks", {
   description: text("description").notNull(),
   instructions: text("instructions").notNull(),
   proofType: text("proof_type").notNull(),
+  requiresKyc: boolean("requires_kyc").notNull().default(false),
   reward: numeric("reward", { precision: 12, scale: 2 }).notNull(),
   totalBudget: numeric("total_budget", { precision: 12, scale: 2 }).notNull(),
   remainingBudget: numeric("remaining_budget", { precision: 12, scale: 2 }).notNull(),

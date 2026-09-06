@@ -28,6 +28,7 @@ export const GetMeResponse = zod.object({
   "role": zod.enum(['worker', 'advertiser', 'admin', 'super_admin']),
   "balance": zod.number(),
   "referralCode": zod.string(),
+  "depositReference": zod.string(),
   "referredBy": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -45,6 +46,7 @@ export const GetDashboardSummaryResponse = zod.object({
   "role": zod.enum(['worker', 'advertiser', 'admin', 'super_admin']),
   "balance": zod.number(),
   "referralCode": zod.string(),
+  "depositReference": zod.string(),
   "referredBy": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }),
@@ -98,6 +100,7 @@ export const ListTasksResponse = zod.object({
   "description": zod.string(),
   "instructions": zod.string(),
   "proofType": zod.enum(['text', 'url', 'image', 'file']),
+  "requiresKyc": zod.boolean(),
   "reward": zod.number(),
   "totalBudget": zod.number(),
   "remainingBudget": zod.number(),
@@ -128,8 +131,6 @@ export const createTaskBodyDescriptionMax = 1000;
 export const createTaskBodyInstructionsMin = 10;
 export const createTaskBodyInstructionsMax = 2000;
 
-export const createTaskBodyRewardMin = 0.01;
-
 export const createTaskBodyMaxCompletionsMax = 100000;
 
 
@@ -140,7 +141,7 @@ export const CreateTaskBody = zod.object({
   "description": zod.string().min(createTaskBodyDescriptionMin).max(createTaskBodyDescriptionMax),
   "instructions": zod.string().min(createTaskBodyInstructionsMin).max(createTaskBodyInstructionsMax),
   "proofType": zod.enum(['text', 'url', 'image', 'file']),
-  "reward": zod.number().min(createTaskBodyRewardMin),
+  "requiresKyc": zod.boolean(),
   "maxCompletions": zod.number().int().min(1).max(createTaskBodyMaxCompletionsMax),
   "deadline": zod.coerce.date()
 })
@@ -154,6 +155,7 @@ export const CreateTaskResponse = zod.object({
   "description": zod.string(),
   "instructions": zod.string(),
   "proofType": zod.enum(['text', 'url', 'image', 'file']),
+  "requiresKyc": zod.boolean(),
   "reward": zod.number(),
   "totalBudget": zod.number(),
   "remainingBudget": zod.number(),
@@ -181,6 +183,7 @@ export const GetTaskResponse = zod.object({
   "description": zod.string(),
   "instructions": zod.string(),
   "proofType": zod.enum(['text', 'url', 'image', 'file']),
+  "requiresKyc": zod.boolean(),
   "reward": zod.number(),
   "totalBudget": zod.number(),
   "remainingBudget": zod.number(),
@@ -298,7 +301,7 @@ export const GetWalletSummaryResponse = zod.object({
  */
 export const ListTransactionsResponseItem = zod.object({
   "id": zod.string(),
-  "type": zod.enum(['task_reward', 'referral_reward', 'task_funding', 'withdrawal', 'refund']),
+  "type": zod.enum(['task_reward', 'platform_reward', 'referral_reward', 'task_funding', 'deposit', 'withdrawal', 'refund']),
   "description": zod.string(),
   "amount": zod.number(),
   "status": zod.enum(['completed', 'pending', 'failed']),
@@ -369,6 +372,62 @@ export const CreateWithdrawalResponse = zod.object({
 
 
 /**
+ * @summary List the signed-in user's deposits
+ */
+export const ListDepositsResponseItem = zod.object({
+  "id": zod.string(),
+  "amount": zod.number(),
+  "bankName": zod.string(),
+  "transferReference": zod.string(),
+  "depositReference": zod.string(),
+  "transferredAt": zod.coerce.date(),
+  "proofUrl": zod.string().url().nullish(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "reviewedAt": zod.coerce.date().nullish()
+})
+export const ListDepositsResponse = zod.array(ListDepositsResponseItem)
+
+
+/**
+ * @summary Submit a bank transfer for admin verification
+ */
+
+export const createDepositBodyBankNameMin = 2;
+export const createDepositBodyBankNameMax = 120;
+
+export const createDepositBodyTransferReferenceMin = 2;
+export const createDepositBodyTransferReferenceMax = 160;
+
+export const createDepositBodyProofUrlMax = 500;
+
+
+
+export const CreateDepositBody = zod.object({
+  "amount": zod.number().min(1),
+  "bankName": zod.string().min(createDepositBodyBankNameMin).max(createDepositBodyBankNameMax),
+  "transferReference": zod.string().min(createDepositBodyTransferReferenceMin).max(createDepositBodyTransferReferenceMax),
+  "transferredAt": zod.coerce.date(),
+  "proofUrl": zod.string().url().max(createDepositBodyProofUrlMax).optional()
+})
+
+export const CreateDepositResponse = zod.object({
+  "id": zod.string(),
+  "amount": zod.number(),
+  "bankName": zod.string(),
+  "transferReference": zod.string(),
+  "depositReference": zod.string(),
+  "transferredAt": zod.coerce.date(),
+  "proofUrl": zod.string().url().nullish(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "reviewedAt": zod.coerce.date().nullish()
+})
+
+
+/**
  * @summary Get protected admin overview
  */
 export const GetAdminOverviewResponse = zod.object({
@@ -397,6 +456,7 @@ export const ListAdminUsersResponseItem = zod.object({
   "role": zod.enum(['worker', 'advertiser', 'admin', 'super_admin']),
   "balance": zod.number(),
   "referralCode": zod.string(),
+  "depositReference": zod.string(),
   "referredBy": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
@@ -424,6 +484,7 @@ export const UpdateUserRoleResponse = zod.object({
   "role": zod.enum(['worker', 'advertiser', 'admin', 'super_admin']),
   "balance": zod.number(),
   "referralCode": zod.string(),
+  "depositReference": zod.string(),
   "referredBy": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
@@ -445,6 +506,64 @@ export const ListAdminWithdrawalsResponseItem = zod.object({
   "processedAt": zod.coerce.date().nullish()
 })
 export const ListAdminWithdrawalsResponse = zod.array(ListAdminWithdrawalsResponseItem)
+
+
+/**
+ * @summary List deposits awaiting verification
+ */
+export const ListAdminDepositsResponseItem = zod.object({
+  "id": zod.string(),
+  "amount": zod.number(),
+  "bankName": zod.string(),
+  "transferReference": zod.string(),
+  "depositReference": zod.string(),
+  "transferredAt": zod.coerce.date(),
+  "proofUrl": zod.string().url().nullish(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "reviewedAt": zod.coerce.date().nullish()
+}).and(zod.object({
+  "userId": zod.string(),
+  "userName": zod.string(),
+  "userEmail": zod.string().email()
+}))
+export const ListAdminDepositsResponse = zod.array(ListAdminDepositsResponseItem)
+
+
+/**
+ * @summary Approve or reject a submitted deposit
+ */
+export const ReviewDepositParams = zod.object({
+  "depositId": zod.coerce.string()
+})
+
+export const reviewDepositBodyNoteMax = 500;
+
+
+
+export const ReviewDepositBody = zod.object({
+  "decision": zod.enum(['approved', 'rejected']),
+  "note": zod.string().max(reviewDepositBodyNoteMax).optional()
+})
+
+export const ReviewDepositResponse = zod.object({
+  "id": zod.string(),
+  "amount": zod.number(),
+  "bankName": zod.string(),
+  "transferReference": zod.string(),
+  "depositReference": zod.string(),
+  "transferredAt": zod.coerce.date(),
+  "proofUrl": zod.string().url().nullish(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "reviewedAt": zod.coerce.date().nullish()
+}).and(zod.object({
+  "userId": zod.string(),
+  "userName": zod.string(),
+  "userEmail": zod.string().email()
+}))
 
 
 /**

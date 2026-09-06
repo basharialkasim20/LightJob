@@ -29,8 +29,7 @@ export interface TaskInput {
      */
   instructions: string;
   proofType: TaskInputProofType;
-  /** @minimum 0.01 */
-  reward: number;
+  requiresKyc: boolean;
   /**
      * @minimum 1
      * @maximum 100000

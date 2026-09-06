@@ -1,0 +1,1 @@
+- [Database migration constraints](database-migration-constraints.md) — avoid destructive unique-constraint pushes when existing rows need a safe backfill.

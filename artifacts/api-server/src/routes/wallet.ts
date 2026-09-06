@@ -2,7 +2,9 @@ import { Router, type IRouter } from "express";
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
   db,
+  depositsTable,
   submissionsTable,
+  tasksTable,
   transactionsTable,
   usersTable,
   withdrawalsTable,
@@ -10,8 +12,11 @@ import {
 import {
   CreateWithdrawalBody,
   CreateWithdrawalResponse,
+  CreateDepositBody,
+  CreateDepositResponse,
   GetReferralSummaryResponse,
   GetWalletSummaryResponse,
+  ListDepositsResponse,
   ListTransactionsResponse,
   ListWithdrawalsResponse,
 } from "@workspace/api-zod";
@@ -19,6 +24,22 @@ import { requireAuth, type AuthenticatedRequest } from "../lib/auth";
 import { iso, money, requiredIso } from "../lib/format";
 
 const router: IRouter = Router();
+
+function depositOutput(deposit: typeof depositsTable.$inferSelect) {
+  return {
+    id: deposit.id,
+    amount: money(deposit.amount),
+    bankName: deposit.bankName,
+    transferReference: deposit.transferReference,
+    depositReference: deposit.depositReference,
+    transferredAt: requiredIso(deposit.transferredAt),
+    proofUrl: deposit.proofUrl,
+    status: deposit.status,
+    note: deposit.note,
+    createdAt: requiredIso(deposit.createdAt),
+    reviewedAt: iso(deposit.reviewedAt),
+  };
+}
 
 router.get("/wallet/summary", requireAuth, async (req, res): Promise<void> => {
   const authReq = req as AuthenticatedRequest;
@@ -35,19 +56,27 @@ router.get("/wallet/summary", requireAuth, async (req, res): Promise<void> => {
     .select()
     .from(submissionsTable)
     .where(and(eq(submissionsTable.workerId, user.id), eq(submissionsTable.status, "pending")));
+  const reservedTasks = await db
+    .select({ remainingBudget: tasksTable.remainingBudget })
+    .from(tasksTable)
+    .where(and(eq(tasksTable.advertiserId, user.id), eq(tasksTable.status, "open")));
   const withdrawals = transactions
     .filter((transaction) => transaction.type === "withdrawal")
     .reduce((sum, transaction) => sum + money(transaction.amount), 0);
   res.json(
     GetWalletSummaryResponse.parse({
       availableBalance: money(user.balance),
-      pendingBalance: pendingSubmissions.reduce((sum, submission) => sum + money(submission.reward) * 0.4, 0),
+       pendingBalance:
+         pendingSubmissions.reduce((sum, submission) => sum + money(submission.reward) * 0.4, 0) +
+         reservedTasks.reduce((sum, task) => sum + money(task.remainingBudget), 0),
       totalEarned: transactions
-        .filter((transaction) => transaction.type === "task_reward" || transaction.type === "referral_reward")
+        .filter((transaction) => ["task_reward", "platform_reward", "referral_reward"].includes(transaction.type))
         .reduce((sum, transaction) => sum + money(transaction.amount), 0),
-      totalSpent: transactions
-        .filter((transaction) => transaction.type === "task_funding")
-        .reduce((sum, transaction) => sum + money(transaction.amount), 0),
+       totalSpent: Math.abs(
+         transactions
+           .filter((transaction) => transaction.type === "task_funding")
+           .reduce((sum, transaction) => sum + money(transaction.amount), 0),
+       ),
       referralEarned: transactions
         .filter((transaction) => transaction.type === "referral_reward")
         .reduce((sum, transaction) => sum + money(transaction.amount), 0),
@@ -77,6 +106,52 @@ router.get("/wallet/transactions", requireAuth, async (req, res): Promise<void> 
       })),
     ),
   );
+});
+
+router.get("/deposits", requireAuth, async (req, res): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  const rows = await db
+    .select()
+    .from(depositsTable)
+    .where(eq(depositsTable.userId, authReq.userId))
+    .orderBy(desc(depositsTable.createdAt));
+  res.json(ListDepositsResponse.parse(rows.map(depositOutput)));
+});
+
+router.post("/deposits", requireAuth, async (req, res): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  const parsed = CreateDepositBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const user = authReq.user;
+  if (!user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  try {
+    const [created] = await db
+      .insert(depositsTable)
+      .values({
+        id: `deposit-${crypto.randomUUID()}`,
+        userId: user.id,
+        amount: parsed.data.amount.toFixed(2),
+        bankName: parsed.data.bankName,
+        transferReference: parsed.data.transferReference,
+        depositReference: user.depositReference ?? `LJ-${user.id.slice(-8).toUpperCase()}`,
+        transferredAt: parsed.data.transferredAt,
+        proofUrl: parsed.data.proofUrl ?? null,
+      })
+      .returning();
+    res.status(201).json(CreateDepositResponse.parse(depositOutput(created)));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("transfer_reference")) {
+      res.status(409).json({ error: "This bank transfer reference has already been submitted." });
+      return;
+    }
+    throw error;
+  }
 });
 
 router.get("/referrals/summary", requireAuth, async (req, res): Promise<void> => {

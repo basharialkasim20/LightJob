@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import {
   db,
+  depositsTable,
   submissionsTable,
   tasksTable,
   transactionsTable,
@@ -10,11 +11,15 @@ import {
 } from "@workspace/db";
 import {
   GetAdminOverviewResponse,
+  ListAdminDepositsResponse,
   ListAdminUsersResponse,
   ListAdminWithdrawalsResponse,
   ReviewWithdrawalBody,
   ReviewWithdrawalParams,
   ReviewWithdrawalResponse,
+  ReviewDepositBody,
+  ReviewDepositParams,
+  ReviewDepositResponse,
   RoleUpdateInput,
   UpdateUserRoleBody,
   UpdateUserRoleParams,
@@ -34,6 +39,7 @@ function adminUser(user: typeof usersTable.$inferSelect) {
     role: user.role,
     balance: money(user.balance),
     referralCode: user.referralCode,
+    depositReference: user.depositReference ?? `LJ-${user.id.slice(-8).toUpperCase()}`,
     referredBy: user.referredBy,
     createdAt: requiredIso(user.createdAt),
     lastActiveAt: requiredIso(user.updatedAt),
@@ -53,6 +59,30 @@ function withdrawalOutput(withdrawal: typeof withdrawalsTable.$inferSelect) {
   };
 }
 
+async function adminDepositOutput(deposit: typeof depositsTable.$inferSelect) {
+  const [user] = await db
+    .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+    .from(usersTable)
+    .where(eq(usersTable.id, deposit.userId))
+    .limit(1);
+  return {
+    id: deposit.id,
+    amount: money(deposit.amount),
+    bankName: deposit.bankName,
+    transferReference: deposit.transferReference,
+    depositReference: deposit.depositReference,
+    transferredAt: requiredIso(deposit.transferredAt),
+    proofUrl: deposit.proofUrl,
+    status: deposit.status,
+    note: deposit.note,
+    createdAt: requiredIso(deposit.createdAt),
+    reviewedAt: iso(deposit.reviewedAt),
+    userId: deposit.userId,
+    userName: user?.name ?? "LightJob member",
+    userEmail: user?.email ?? "",
+  };
+}
+
 router.get("/admin/overview", requireAdmin, async (_req, res): Promise<void> => {
   const [[totalUsers], [activeTasks], [pendingSubmissions], [pendingWithdrawals], [volume], [revenue]] =
     await Promise.all([
@@ -64,7 +94,7 @@ router.get("/admin/overview", requireAdmin, async (_req, res): Promise<void> => 
       db
         .select({ value: sql<string>`coalesce(sum(${transactionsTable.amount}), 0)` })
         .from(transactionsTable)
-        .where(eq(transactionsTable.type, "referral_reward")),
+        .where(eq(transactionsTable.type, "platform_reward")),
     ]);
   res.json(
     GetAdminOverviewResponse.parse({
@@ -115,6 +145,70 @@ router.get("/admin/withdrawals", requireAdmin, async (_req, res): Promise<void> 
     .where(eq(withdrawalsTable.status, "pending"))
     .orderBy(desc(withdrawalsTable.requestedAt));
   res.json(ListAdminWithdrawalsResponse.parse(rows.map(withdrawalOutput)));
+});
+
+router.get("/admin/deposits", requireAdmin, async (_req, res): Promise<void> => {
+  const rows = await db
+    .select()
+    .from(depositsTable)
+    .orderBy(desc(depositsTable.createdAt))
+    .limit(100);
+  res.json(ListAdminDepositsResponse.parse(await Promise.all(rows.map(adminDepositOutput))));
+});
+
+router.post("/admin/deposits/:depositId/review", requireAdmin, async (req, res): Promise<void> => {
+  const params = ReviewDepositParams.safeParse(req.params);
+  const body = ReviewDepositBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    const message = !params.success ? params.error.message : !body.success ? body.error.message : "Invalid request";
+    res.status(400).json({ error: message });
+    return;
+  }
+  const [deposit] = await db
+    .select()
+    .from(depositsTable)
+    .where(eq(depositsTable.id, params.data.depositId))
+    .limit(1);
+  if (!deposit) {
+    res.status(404).json({ error: "Deposit not found" });
+    return;
+  }
+  if (deposit.status !== "pending") {
+    res.status(400).json({ error: "Deposit has already been reviewed" });
+    return;
+  }
+  const reviewed = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(depositsTable)
+      .set({
+        status: body.data.decision,
+        note: body.data.note ?? null,
+        reviewedAt: new Date(),
+      })
+      .where(and(eq(depositsTable.id, deposit.id), eq(depositsTable.status, "pending")))
+      .returning();
+    if (!updated) {
+      const error = new Error("Deposit has already been reviewed");
+      (error as Error & { statusCode?: number }).statusCode = 409;
+      throw error;
+    }
+    if (body.data.decision === "approved") {
+      await tx
+        .update(usersTable)
+        .set({ balance: sql`${usersTable.balance} + ${deposit.amount}` })
+        .where(eq(usersTable.id, deposit.userId));
+      await tx.insert(transactionsTable).values({
+        id: `transaction-${crypto.randomUUID()}`,
+        userId: deposit.userId,
+        type: "deposit",
+        description: `Verified bank deposit ${deposit.transferReference}`,
+        amount: deposit.amount,
+        status: "completed",
+      });
+    }
+    return updated;
+  });
+  res.json(ReviewDepositResponse.parse(await adminDepositOutput(reviewed)));
 });
 
 router.post("/admin/withdrawals/:withdrawalId/review", requireAdmin, async (req, res): Promise<void> => {

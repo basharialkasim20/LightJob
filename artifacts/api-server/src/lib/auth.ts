@@ -45,6 +45,7 @@ export async function ensureUser(req: Request): Promise<User | null> {
       avatarUrl,
       role,
       referralCode: `LJ-${userId.slice(-8).toUpperCase()}`,
+      depositReference: `LJ-${userId.slice(-8).toUpperCase()}`,
     })
     .returning();
   return inserted[0] ?? null;

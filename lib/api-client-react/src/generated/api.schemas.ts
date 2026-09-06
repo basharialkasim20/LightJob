@@ -32,6 +32,7 @@ export interface UserProfile {
   role: UserProfileRole;
   balance: number;
   referralCode: string;
+  depositReference: string;
   /** @nullable */
   referredBy?: string | null;
   createdAt: string;
@@ -103,6 +104,7 @@ export interface Task {
   description: string;
   instructions: string;
   proofType: TaskProofType;
+  requiresKyc: boolean;
   reward: number;
   totalBudget: number;
   remainingBudget: number;
@@ -145,8 +147,7 @@ export interface TaskInput {
      */
   instructions: string;
   proofType: TaskInputProofType;
-  /** @minimum 0.01 */
-  reward: number;
+  requiresKyc: boolean;
   /**
      * @minimum 1
      * @maximum 100000
@@ -223,8 +224,10 @@ export type TransactionType = typeof TransactionType[keyof typeof TransactionTyp
 
 export const TransactionType = {
   task_reward: 'task_reward',
+  platform_reward: 'platform_reward',
   referral_reward: 'referral_reward',
   task_funding: 'task_funding',
+  deposit: 'deposit',
   withdrawal: 'withdrawal',
   refund: 'refund',
 } as const;
@@ -330,6 +333,70 @@ export interface WithdrawalReviewInput {
   /** @maxLength 500 */
   note?: string;
 }
+
+export type DepositStatus = typeof DepositStatus[keyof typeof DepositStatus];
+
+
+export const DepositStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface Deposit {
+  id: string;
+  amount: number;
+  bankName: string;
+  transferReference: string;
+  depositReference: string;
+  transferredAt: string;
+  /** @nullable */
+  proofUrl?: string | null;
+  status: DepositStatus;
+  /** @nullable */
+  note?: string | null;
+  createdAt: string;
+  /** @nullable */
+  reviewedAt?: string | null;
+}
+
+export interface DepositInput {
+  /** @minimum 1 */
+  amount: number;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  bankName: string;
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  transferReference: string;
+  transferredAt: string;
+  /** @maxLength 500 */
+  proofUrl?: string;
+}
+
+export type DepositReviewInputDecision = typeof DepositReviewInputDecision[keyof typeof DepositReviewInputDecision];
+
+
+export const DepositReviewInputDecision = {
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface DepositReviewInput {
+  decision: DepositReviewInputDecision;
+  /** @maxLength 500 */
+  note?: string;
+}
+
+export type AdminDeposit = Deposit & {
+  userId: string;
+  userName: string;
+  userEmail: string;
+};
 
 export type AdminOverviewPayoutSplit = {
   owner: number;

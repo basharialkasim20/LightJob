@@ -295,6 +295,43 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /deposits:
+    get:
+      operationId: listDeposits
+      tags: [wallet]
+      summary: List the signed-in user's deposits
+      responses:
+        "200":
+          description: Deposit records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Deposit"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createDeposit
+      tags: [wallet]
+      summary: Submit a bank transfer for admin verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositInput"
+      responses:
+        "201":
+          description: Pending deposit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deposit"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /admin/overview:
     get:
       operationId: getAdminOverview
@@ -365,6 +402,44 @@ paths:
                   $ref: "#/components/schemas/Withdrawal"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /admin/deposits:
+    get:
+      operationId: listAdminDeposits
+      tags: [admin]
+      summary: List deposits awaiting verification
+      responses:
+        "200":
+          description: Deposit queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminDeposit"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/deposits/{depositId}/review:
+    post:
+      operationId: reviewDeposit
+      tags: [admin]
+      summary: Approve or reject a submitted deposit
+      parameters:
+        - $ref: "#/components/parameters/DepositId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositReviewInput"
+      responses:
+        "200":
+          description: Reviewed deposit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDeposit"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /admin/withdrawals/{withdrawalId}/review:
     post:
       operationId: reviewWithdrawal
@@ -403,6 +478,12 @@ components:
         type: string
     WithdrawalId:
       name: withdrawalId
+      in: path
+      required: true
+      schema:
+        type: string
+    DepositId:
+      name: depositId
       in: path
       required: true
       schema:
@@ -454,7 +535,7 @@ components:
       required: [error]
     UserProfile:
       type: object
-      required: [id, name, email, role, balance, referralCode, createdAt]
+      required: [id, name, email, role, balance, referralCode, depositReference, createdAt]
       properties:
         id: { type: string }
         name: { type: string }
@@ -465,6 +546,7 @@ components:
           enum: [worker, advertiser, admin, super_admin]
         balance: { type: number }
         referralCode: { type: string }
+        depositReference: { type: string }
         referredBy: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
     DashboardSummary:
@@ -502,7 +584,7 @@ components:
         amount: { type: number }
     Task:
       type: object
-      required: [id, title, advertiserId, advertiserName, category, description, instructions, proofType, reward, totalBudget, remainingBudget, maxCompletions, completedCount, status, deadline, createdAt]
+      required: [id, title, advertiserId, advertiserName, category, description, instructions, proofType, requiresKyc, reward, totalBudget, remainingBudget, maxCompletions, completedCount, status, deadline, createdAt]
       properties:
         id: { type: string }
         title: { type: string }
@@ -512,6 +594,7 @@ components:
         description: { type: string }
         instructions: { type: string }
         proofType: { type: string, enum: [text, url, image, file] }
+        requiresKyc: { type: boolean }
         reward: { type: number }
         totalBudget: { type: number }
         remainingBudget: { type: number }
@@ -522,14 +605,14 @@ components:
         createdAt: { type: string, format: date-time }
     TaskInput:
       type: object
-      required: [title, category, description, instructions, proofType, reward, maxCompletions, deadline]
+      required: [title, category, description, instructions, proofType, requiresKyc, maxCompletions, deadline]
       properties:
         title: { type: string, minLength: 3, maxLength: 120 }
         category: { type: string, minLength: 2, maxLength: 40 }
         description: { type: string, minLength: 10, maxLength: 1000 }
         instructions: { type: string, minLength: 10, maxLength: 2000 }
         proofType: { type: string, enum: [text, url, image, file] }
-        reward: { type: number, minimum: 0.01 }
+        requiresKyc: { type: boolean }
         maxCompletions: { type: integer, minimum: 1, maximum: 100000 }
         deadline: { type: string, format: date-time }
     TaskList:
@@ -583,7 +666,7 @@ components:
       required: [id, type, description, amount, status, createdAt]
       properties:
         id: { type: string }
-        type: { type: string, enum: [task_reward, referral_reward, task_funding, withdrawal, refund] }
+        type: { type: string, enum: [task_reward, platform_reward, referral_reward, task_funding, deposit, withdrawal, refund] }
         description: { type: string }
         amount: { type: number }
         status: { type: string, enum: [completed, pending, failed] }
@@ -633,6 +716,45 @@ components:
       properties:
         decision: { type: string, enum: [approved, rejected, paid] }
         note: { type: string, maxLength: 500 }
+    Deposit:
+      type: object
+      required: [id, amount, bankName, transferReference, depositReference, transferredAt, status, createdAt]
+      properties:
+        id: { type: string }
+        amount: { type: number }
+        bankName: { type: string }
+        transferReference: { type: string }
+        depositReference: { type: string }
+        transferredAt: { type: string, format: date-time }
+        proofUrl: { type: ["string", "null"], format: uri }
+        status: { type: string, enum: [pending, approved, rejected] }
+        note: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        reviewedAt: { type: ["string", "null"], format: date-time }
+    DepositInput:
+      type: object
+      required: [amount, bankName, transferReference, transferredAt]
+      properties:
+        amount: { type: number, minimum: 1 }
+        bankName: { type: string, minLength: 2, maxLength: 120 }
+        transferReference: { type: string, minLength: 2, maxLength: 160 }
+        transferredAt: { type: string, format: date-time }
+        proofUrl: { type: string, format: uri, maxLength: 500 }
+    DepositReviewInput:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approved, rejected] }
+        note: { type: string, maxLength: 500 }
+    AdminDeposit:
+      allOf:
+        - $ref: "#/components/schemas/Deposit"
+        - type: object
+          required: [userId, userName, userEmail]
+          properties:
+            userId: { type: string }
+            userName: { type: string }
+            userEmail: { type: string, format: email }
     AdminOverview:
       type: object
       required: [totalUsers, activeTasks, pendingSubmissions, pendingWithdrawals, totalVolume, platformRevenue, payoutSplit]

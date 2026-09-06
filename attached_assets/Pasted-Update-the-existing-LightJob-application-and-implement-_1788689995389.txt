@@ -1,0 +1,602 @@
+Update the existing LightJob application and implement ALL of the following requirements. Do NOT create a new project.
+
+IMPORTANT:
+This is an update to the existing LightJob system. Preserve existing functionality and improve/fix it.
+
+PLATFORM:
+
+- Name: LightJob
+- Currency: Nigerian Naira (₦ / NGN) ONLY.
+- Remove USD ($), EUR (€), and all other currencies from the UI.
+- Mobile-first and optimized for Android.
+
+==================================================
+
+1. USER TYPES AND ROLES
+   ==================================================
+
+Every newly registered account must be:
+
+role = user
+
+There must be NO public Admin registration.
+
+Only the Super Admin can promote an existing user to Admin.
+
+The Super Admin can:
+
+- Add Admin
+- Remove Admin
+- View all users
+- Manage platform settings
+
+Normal users must never see Admin options.
+
+==================================================
+2. USER DASHBOARD
+
+Show:
+
+- Wallet Balance
+- Available Balance
+- Pending Balance
+- Total Earnings
+- Total Withdrawn
+- Completed Tasks
+- Available Tasks
+- My Tasks
+- Referral Earnings
+- Referral Count
+- Deposit
+- Withdraw
+- Transactions
+- Notifications
+- Settings
+
+==================================================
+3. ADVERTISER DEPOSIT SYSTEM
+
+Users who want to create tasks must first deposit money into their LightJob wallet.
+
+Create a dedicated:
+
+"Advertiser Deposit" section.
+
+Show the official LightJob deposit bank details clearly.
+
+The deposit instructions must contain:
+
+- Bank Name
+- Account Name
+- Account Number
+- Deposit Reference / User ID
+
+IMPORTANT:
+The deposit account belongs to the platform owner.
+
+Every user must have a UNIQUE deposit reference.
+
+Example:
+
+User ID:
+LJ-10452
+
+Deposit Reference:
+LJ-10452
+
+When an advertiser makes a bank transfer, they must enter/submit:
+
+- Amount
+- Bank used
+- Transfer reference
+- Date/time
+- Optional payment proof/screenshot
+
+==================================================
+4. HOW ADMIN IDENTIFIES A DEPOSIT
+
+The Admin Dashboard must have:
+
+"Deposit Management"
+
+Every deposit record must show:
+
+- User name
+- User ID
+- Email/phone
+- Deposit amount
+- Deposit reference
+- Bank transfer reference
+- Date/time
+- Proof
+- Status
+
+Statuses:
+
+Pending
+Approved
+Rejected
+
+When a deposit is received in the platform owner's bank account, the admin can match the payment using:
+
+- User ID / deposit reference
+- Transfer reference
+- Amount
+- Payment date/time
+- Payment proof
+
+The admin can then click:
+
+"Approve Deposit"
+
+Only after approval should the deposited amount become available in the user's wallet balance.
+
+When approved, show the user:
+
+"Deposit Successful"
+
+and update:
+
+Available Balance + deposited amount.
+
+IMPORTANT:
+Do not automatically claim that money was received unless the deposit has been verified/approved by the admin or verified through a future payment gateway.
+
+==================================================
+5. ADVERTISER WALLET
+
+Advertiser money must be kept separate in the user's wallet ledger.
+
+Show:
+
+Available Balance
+Pending Task Funds
+Total Deposited
+Total Spent on Tasks
+Transaction History
+
+When an advertiser creates a task, the required task budget must be reserved from their Available Balance.
+
+Example:
+
+Advertiser has:
+₦10,000 Available Balance.
+
+They create:
+
+50 KYC workers × ₦400 = ₦20,000
+
+The system must NOT allow the task because the available balance is insufficient.
+
+If they have ₦30,000:
+
+₦20,000 becomes:
+
+"Pending/Reserved Task Funds"
+
+and cannot be withdrawn or spent on another task.
+
+==================================================
+6. TASK PRICING
+
+KYC REQUIRED:
+
+₦400 per completed worker.
+
+NO KYC REQUIRED:
+
+₦200 per completed worker.
+
+The advertiser's task budget must be calculated automatically.
+
+Example:
+
+100 workers × ₦400 = ₦40,000 total budget.
+
+Example:
+
+100 workers × ₦200 = ₦20,000 total budget.
+
+==================================================
+7. AUTOMATIC 40/40/20 DISTRIBUTION
+
+For every VALID and APPROVED completed task:
+
+40% → Platform Owner
+40% → Worker
+20% → Worker's DIRECT REFERRER
+
+KYC task:
+
+₦400:
+Owner = ₦160
+Worker = ₦160
+Direct Referrer = ₦80
+
+Non-KYC task:
+
+₦200:
+Owner = ₦80
+Worker = ₦80
+Direct Referrer = ₦40
+
+This must be calculated automatically by the backend.
+
+The system must prevent:
+
+- Duplicate submissions
+- Duplicate rewards
+- Double payment
+- Negative wallet balances
+
+==================================================
+8. TASK FUND RESERVATION AND REFUND RULE
+
+When an advertiser creates a task, the required task budget is RESERVED.
+
+The reserved money becomes:
+
+"Locked Task Funds"
+
+The advertiser cannot withdraw or reuse the locked task funds while the task is active.
+
+IMPORTANT REFUND RULE:
+
+The task budget is NON-REFUNDABLE for the first 4 DAYS after the task is created.
+
+During those first 4 days:
+
+- Advertiser cannot cancel the task for a refund.
+- Advertiser cannot withdraw the reserved task funds.
+- Reserved funds remain locked.
+
+After 4 days:
+
+If some or all task slots were NOT completed, the system may make the unused portion eligible for refund according to the platform's refund rules.
+
+Example:
+
+Advertiser creates a task for:
+
+100 workers × ₦400 = ₦40,000.
+
+After 4 days:
+
+60 workers completed the task.
+
+40 workers remain.
+
+The used portion:
+60 × ₦400 = ₦24,000
+
+Unused portion:
+40 × ₦400 = ₦16,000
+
+The unused ₦16,000 can become:
+
+"Refund Eligible"
+
+and may be returned to the advertiser's Available Balance after the applicable task/refund process.
+
+IMPORTANT:
+Money already distributed for valid completed tasks must NEVER be refunded to the advertiser.
+
+==================================================
+9. TASK LIFECYCLE
+
+Use clear task statuses:
+
+Draft
+Pending Funding
+Active
+Paused
+Completed
+Expired
+Refund Processing
+Refunded
+Cancelled
+
+When sufficient funds are available:
+
+Task → Active
+
+When all worker slots are completed:
+
+Task → Completed
+
+If the task reaches its end date with incomplete slots:
+
+Apply the 4-day/refund rules and release eligible unused funds according to the system rules.
+
+==================================================
+10. TASK CREATION
+
+Advertiser can define:
+
+- Task Title
+- Description
+- Task Requirements
+- KYC Required: Yes/No
+- Number of Workers
+- Proof Required
+- Start Date
+- End Date
+- Task Category
+
+The system automatically calculates:
+
+Price per worker
+×
+Number of workers
+
+Total Task Budget
+
+The system must check the advertiser's Available Balance before activating the task.
+
+==================================================
+11. TASK VERIFICATION
+
+Worker:
+
+Start Task
+→ Complete Requirements
+→ Submit Proof
+→ System Verification
+→ Valid/Approved
+→ Automatic Reward Distribution
+
+Use rule-based verification and anti-fraud checks.
+
+Do not generate rewards for invalid or duplicate submissions.
+
+==================================================
+12. REFERRAL SYSTEM
+
+Every user gets:
+
+- Unique referral code
+- Unique referral link
+
+The direct referrer receives 20% of the valid completed task reward.
+
+Example:
+
+User A invites User B.
+
+User B completes a ₦400 KYC task.
+
+User A receives:
+
+₦80 referral commission.
+
+If the Platform Owner directly referred the worker, the Owner receives the normal 40% platform share PLUS the 20% direct referral commission.
+
+Do not create unlimited multi-level referral commissions.
+
+==================================================
+13. WITHDRAWAL SYSTEM
+
+Users can request withdrawals from their available balance.
+
+Withdrawal fields:
+
+- Amount
+- Bank Name
+- Account Name
+- Account Number
+
+Withdrawal status:
+
+Pending
+Processing
+Paid
+Rejected
+
+Admin Dashboard must show:
+
+User
+Amount
+Bank
+Account Name
+Account Number
+Date
+Status
+
+After the admin manually sends the real bank transfer, admin can click:
+
+"Sent Successfully"
+
+The user then sees:
+
+"Withdrawal Successful"
+
+IMPORTANT:
+The system must NOT falsely claim that a bank transfer happened automatically.
+
+"Sent Successfully" is an admin confirmation after the external payment has actually been made.
+
+==================================================
+14. ADMIN DASHBOARD
+
+Admin Dashboard must be protected on the backend.
+
+Include:
+
+- Users
+- Tasks
+- Task Submissions
+- Deposits
+- Withdrawals
+- Transactions
+- Referrals
+- KYC Status
+- Reports
+- Admin Management
+
+Deposit Management must allow:
+
+View Deposit
+Approve Deposit
+Reject Deposit
+
+Withdrawal Management must allow:
+
+View Withdrawal
+Process Withdrawal
+Mark as Sent Successfully
+Reject Withdrawal
+
+==================================================
+15. SUPER ADMIN
+
+Only Super Admin can:
+
+- Add Admin
+- Remove Admin
+- Manage Admin permissions
+- View all financial activity
+- Manage platform settings
+- Manage deposit account information
+- Configure task/refund rules
+
+Normal Admins cannot promote themselves or other users to Super Admin.
+
+==================================================
+16. TRANSACTION LEDGER
+
+Every financial event must create a transaction record.
+
+Transaction types:
+
+Deposit
+Task Budget Reserved
+Task Reward
+Owner Commission
+Worker Reward
+Referral Commission
+Refund
+Withdrawal
+Withdrawal Reversal
+
+Each transaction must include:
+
+- Transaction ID
+- User ID
+- Amount
+- Currency
+- Type
+- Status
+- Date/time
+- Related Task ID where applicable
+- Related Deposit/Withdrawal ID where applicable
+
+Use atomic database transactions for financial operations.
+
+Never use floating-point arithmetic for money.
+
+==================================================
+17. SECURITY
+
+Implement:
+
+- Secure authentication
+- Password hashing
+- Server-side authorization
+- Role-based access control
+- Protected admin routes
+- Input validation
+- Duplicate transaction protection
+- Duplicate reward protection
+- Negative balance protection
+- Audit logs for admin actions
+
+Users must never be able to edit their own wallet balance.
+
+Users must never be able to give themselves Admin privileges.
+
+==================================================
+18. DATABASE
+
+Use a real database.
+
+Create appropriate tables/models for:
+
+users
+roles
+wallets
+wallet_transactions
+tasks
+task_requirements
+task_submissions
+referrals
+deposits
+withdrawals
+kyc_records
+notifications
+admin_actions
+audit_logs
+
+Use proper relationships and indexes.
+
+==================================================
+19. HOMEPAGE
+
+Create a professional LightJob homepage containing:
+
+LightJob branding
+
+Buttons:
+
+- Start Earning
+- Create Tasks
+- Login
+- Sign Up
+
+Sections:
+
+- How LightJob Works
+- Earn by Completing Tasks
+- Create Your Own Tasks
+- Referral Rewards
+- Secure Wallet
+- Frequently Asked Questions
+
+==================================================
+20. IMPORTANT DEVELOPMENT RULE
+
+Do not replace the existing project.
+
+Update and improve the existing LightJob application.
+
+Do not use fake financial balances.
+
+Do not create fake successful deposits.
+
+Do not claim real bank transfers happened automatically.
+
+Keep payment processing ready for future integration with a legitimate payment provider.
+
+For now, deposit approval can be admin-controlled.
+
+Make the entire application responsive, professional and easy to use on Android.
+
+After implementing these changes, test all important flows:
+
+Register
+Login
+Referral
+Deposit submission
+Admin deposit approval
+Wallet update
+Create Task
+Task budget reservation
+Task completion
+Task verification
+40/40/20 distribution
+4-day refund eligibility
+Withdrawal request
+Admin withdrawal processing
+Mark withdrawal as Sent Successfully
+Logout
+
+Fix any errors found during testing.

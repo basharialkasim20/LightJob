@@ -16,6 +16,7 @@ export interface UserProfile {
   role: UserProfileRole;
   balance: number;
   referralCode: string;
+  depositReference: string;
   /** @nullable */
   referredBy?: string | null;
   createdAt: Date;

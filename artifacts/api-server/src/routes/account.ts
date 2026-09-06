@@ -25,6 +25,7 @@ function profile(user: NonNullable<AuthenticatedRequest["user"]>) {
     role: user.role,
     balance: money(user.balance),
     referralCode: user.referralCode,
+    depositReference: user.depositReference ?? `LJ-${user.id.slice(-8).toUpperCase()}`,
     referredBy: user.referredBy,
     createdAt: requiredIso(user.createdAt),
   };
@@ -68,7 +69,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
     ]);
 
   const earningsThisMonth = transactions
-    .filter((transaction) => transaction.type === "task_reward" || transaction.type === "referral_reward")
+    .filter((transaction) => ["task_reward", "platform_reward", "referral_reward"].includes(transaction.type))
     .reduce((sum, transaction) => sum + money(transaction.amount), 0);
   const recentActivity = transactions.slice(0, 5).map((transaction) => ({
     id: transaction.id,

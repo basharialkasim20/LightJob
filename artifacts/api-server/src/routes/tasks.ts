@@ -43,6 +43,7 @@ async function taskOutput(task: typeof tasksTable.$inferSelect) {
     description: task.description,
     instructions: task.instructions,
     proofType: task.proofType,
+    requiresKyc: task.requiresKyc,
     reward: money(task.reward),
     totalBudget: money(task.totalBudget),
     remainingBudget: money(task.remainingBudget),
@@ -128,17 +129,54 @@ router.post("/tasks", requireAuth, async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const totalBudget = parsed.data.reward * parsed.data.maxCompletions;
+  const reward = parsed.data.requiresKyc ? 400 : 200;
+  const totalBudget = reward * parsed.data.maxCompletions;
   const task = {
     id: `task-${crypto.randomUUID()}`,
     advertiserId: user.id,
     ...parsed.data,
-    reward: parsed.data.reward.toFixed(2),
+    requiresKyc: parsed.data.requiresKyc,
+    reward: reward.toFixed(2),
     totalBudget: totalBudget.toFixed(2),
     remainingBudget: totalBudget.toFixed(2),
     maxCompletions: parsed.data.maxCompletions,
   };
-  const [created] = await db.insert(tasksTable).values(task).returning();
+  let created: typeof tasksTable.$inferSelect | undefined;
+  try {
+    created = await db.transaction(async (tx) => {
+      const [funded] = await tx
+        .update(usersTable)
+        .set({ balance: sql`${usersTable.balance} - ${totalBudget.toFixed(2)}` })
+        .where(and(eq(usersTable.id, user.id), sql`${usersTable.balance} >= ${totalBudget.toFixed(2)}`))
+        .returning({ id: usersTable.id });
+      if (!funded) {
+        const error = new Error("Insufficient available balance. Deposit and approve funds before publishing this task.");
+        (error as Error & { statusCode?: number }).statusCode = 400;
+        throw error;
+      }
+      const [inserted] = await tx.insert(tasksTable).values(task).returning();
+      await tx.insert(transactionsTable).values({
+        id: `transaction-${crypto.randomUUID()}`,
+        userId: user.id,
+        type: "task_funding",
+        description: `Reserved budget for ${task.title}`,
+        amount: (-totalBudget).toFixed(2),
+        status: "completed",
+        taskId: task.id,
+      });
+      return inserted;
+    });
+  } catch (error) {
+    if (error instanceof Error && (error as Error & { statusCode?: number }).statusCode === 400) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
+  if (!created) {
+    res.status(500).json({ error: "Task could not be created" });
+    return;
+  }
   res.status(201).json(CreateTaskResponse.parse(await taskOutput(created)));
 });
 
@@ -247,10 +285,24 @@ router.post("/submissions/:submissionId/review", requireAuth, async (req, res): 
     return;
   }
 
-  const reward = money(task.reward);
-  const ownerShare = reward * 0.4;
-  const workerShare = reward * 0.4;
-  const referrerShare = reward * 0.2;
+  const [platformOwner] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.role, "super_admin"))
+    .orderBy(usersTable.createdAt)
+    .limit(1);
+  if (!platformOwner) {
+    res.status(503).json({ error: "Platform owner is not configured yet" });
+    return;
+  }
+  const rewardCents = Math.round(money(task.reward) * 100);
+  const ownerShareCents = Math.round(rewardCents * 0.4);
+  const workerShareCents = Math.round(rewardCents * 0.4);
+  const referrerShareCents = rewardCents - ownerShareCents - workerShareCents;
+  const centsToAmount = (cents: number) => (cents / 100).toFixed(2);
+  const ownerShare = centsToAmount(ownerShareCents);
+  const workerShare = centsToAmount(workerShareCents);
+  const referrerShare = centsToAmount(referrerShareCents);
   const [worker] = await db.select().from(usersTable).where(eq(usersTable.id, submission.workerId)).limit(1);
   const referrer = worker?.referredBy
     ? (await db.select().from(usersTable).where(eq(usersTable.id, worker.referredBy)).limit(1))[0]
@@ -260,31 +312,42 @@ router.post("/submissions/:submissionId/review", requireAuth, async (req, res): 
     const [reviewed] = await tx
       .update(submissionsTable)
       .set({ status: "approved", reviewerNote: body.data.reviewerNote ?? null, reviewedAt: new Date() })
-      .where(eq(submissionsTable.id, submission.id))
+      .where(and(eq(submissionsTable.id, submission.id), eq(submissionsTable.status, "pending")))
       .returning();
-    await tx
+    if (!reviewed) {
+      const error = new Error("This submission has already been reviewed");
+      (error as Error & { statusCode?: number }).statusCode = 409;
+      throw error;
+    }
+    const [capacityUpdated] = await tx
       .update(tasksTable)
       .set({
-        completedCount: task.completedCount + 1,
-        remainingBudget: sql`${tasksTable.remainingBudget} - ${reward.toFixed(2)}`,
-        status: task.completedCount + 1 >= task.maxCompletions ? "completed" : "open",
+        completedCount: sql`${tasksTable.completedCount} + 1`,
+        remainingBudget: sql`${tasksTable.remainingBudget} - ${task.reward}`,
+        status: sql`case when ${tasksTable.completedCount} + 1 >= ${task.maxCompletions} then 'completed' else 'open' end`,
       })
-      .where(eq(tasksTable.id, task.id));
+      .where(and(eq(tasksTable.id, task.id), sql`${tasksTable.completedCount} < ${task.maxCompletions}`))
+      .returning({ id: tasksTable.id });
+    if (!capacityUpdated) {
+      const error = new Error("This task no longer has available completion capacity");
+      (error as Error & { statusCode?: number }).statusCode = 409;
+      throw error;
+    }
     await tx
       .update(usersTable)
-      .set({ balance: sql`${usersTable.balance} + ${ownerShare.toFixed(2)}` })
-      .where(eq(usersTable.id, task.advertiserId));
+      .set({ balance: sql`${usersTable.balance} + ${ownerShare}` })
+      .where(eq(usersTable.id, platformOwner.id));
     await tx
       .update(usersTable)
-      .set({ balance: sql`${usersTable.balance} + ${workerShare.toFixed(2)}` })
+      .set({ balance: sql`${usersTable.balance} + ${workerShare}` })
       .where(eq(usersTable.id, submission.workerId));
     await tx.insert(transactionsTable).values([
       {
         id: `transaction-${crypto.randomUUID()}`,
-        userId: task.advertiserId,
-        type: "task_reward",
-        description: `Owner share for ${task.title}`,
-        amount: ownerShare.toFixed(2),
+        userId: platformOwner.id,
+        type: "platform_reward",
+        description: `Platform owner share for ${task.title}`,
+        amount: ownerShare,
         status: "completed",
         taskId: task.id,
       },
@@ -293,7 +356,7 @@ router.post("/submissions/:submissionId/review", requireAuth, async (req, res): 
         userId: submission.workerId,
         type: "task_reward",
         description: `Worker reward for ${task.title}`,
-        amount: workerShare.toFixed(2),
+        amount: workerShare,
         status: "completed",
         taskId: task.id,
       },
@@ -301,14 +364,28 @@ router.post("/submissions/:submissionId/review", requireAuth, async (req, res): 
     if (referrer) {
       await tx
         .update(usersTable)
-        .set({ balance: sql`${usersTable.balance} + ${referrerShare.toFixed(2)}` })
+        .set({ balance: sql`${usersTable.balance} + ${referrerShare}` })
         .where(eq(usersTable.id, referrer.id));
       await tx.insert(transactionsTable).values({
         id: `transaction-${crypto.randomUUID()}`,
         userId: referrer.id,
         type: "referral_reward",
         description: `Direct referral share from ${task.title}`,
-        amount: referrerShare.toFixed(2),
+        amount: referrerShare,
+        status: "completed",
+        taskId: task.id,
+      });
+    } else {
+      await tx
+        .update(usersTable)
+        .set({ balance: sql`${usersTable.balance} + ${referrerShare}` })
+        .where(eq(usersTable.id, platformOwner.id));
+      await tx.insert(transactionsTable).values({
+        id: `transaction-${crypto.randomUUID()}`,
+        userId: platformOwner.id,
+        type: "platform_reward",
+        description: `Unassigned referral share for ${task.title}`,
+        amount: referrerShare,
         status: "completed",
         taskId: task.id,
       });

@@ -8,11 +8,17 @@
 
 export * from './activity';
 export * from './activityType';
+export * from './adminDeposit';
 export * from './adminOverview';
 export * from './adminOverviewPayoutSplit';
 export * from './adminUser';
 export * from './badRequestResponse';
 export * from './dashboardSummary';
+export * from './deposit';
+export * from './depositInput';
+export * from './depositReviewInput';
+export * from './depositReviewInputDecision';
+export * from './depositStatus';
 export * from './earningsPoint';
 export * from './error';
 export * from './forbiddenResponse';
